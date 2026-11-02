@@ -1,0 +1,36 @@
+# --- Secrets: never commit these ---
+.env
+.env.*
+*.key
+*.pem
+secrets/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+build/
+dist/
+
+# --- Go (Bifrost plugin builds) ---
+*.so
+*.test
+/bin/
+
+# --- Local data and caches ---
+.cache/
+data/raw/
+results/cache/
+*.sqlite
+*.db
+
+# --- Editors and OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
