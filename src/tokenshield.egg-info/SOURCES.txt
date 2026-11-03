@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+src/tokenshield/__init__.py
+src/tokenshield.egg-info/PKG-INFO
+src/tokenshield.egg-info/SOURCES.txt
+src/tokenshield.egg-info/dependency_links.txt
+src/tokenshield.egg-info/requires.txt
+src/tokenshield.egg-info/top_level.txt
