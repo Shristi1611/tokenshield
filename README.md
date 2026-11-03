@@ -82,7 +82,3 @@ Planned, will be updated as files land.
 ## Quick start
 
 Coming once there is something to run.
-
-## License
-
-MIT. See [LICENSE](LICENSE).
