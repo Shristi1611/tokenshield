@@ -34,3 +34,5 @@ results/cache/
 .idea/
 .DS_Store
 Thumbs.db
+
+bifrost-data/
