@@ -39,11 +39,22 @@ class LLMClient(Protocol):
 
 
 class ExtractionFailed(Exception):
-    """No valid typed facts were produced. `reason` is a fixed category string."""
+    """No valid typed facts were produced. `reason` is a fixed category string.
 
-    def __init__(self, reason: str) -> None:
+    input_tokens and output_tokens are what the quarantined model consumed before the
+    failure, when known. They are needed to count the true cost of quarantine.
+    """
+
+    def __init__(
+        self,
+        reason: str,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+    ) -> None:
         super().__init__(reason)
         self.reason = reason
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
 
 
 @dataclass(frozen=True)
@@ -128,6 +139,11 @@ def _parse_json_object(text: str) -> dict[str, object]:
     return parsed
 
 
+def _failed(reason: str, completion: Completion) -> ExtractionFailed:
+    """A failure that still reports the tokens the quarantined model already spent."""
+    return ExtractionFailed(reason, completion.input_tokens, completion.output_tokens)
+
+
 def extract(
     client: LLMClient,
     schema: FactSchema,
@@ -142,21 +158,23 @@ def extract(
     nonce = secrets.token_hex(8)
     system = build_system_prompt(schema)
     user = f"<<<DATA {nonce}>>>\n{window}\n<<<END {nonce}>>>"
-   
     try:
         completion = client.complete(system, user)
     except Exception:  # noqa: BLE001 - fail closed on any client error, never leak its message
         raise ExtractionFailed(LLM_ERROR) from None
     if not isinstance(completion.text, str):
-        raise ExtractionFailed(BAD_JSON)
+        raise _failed(BAD_JSON, completion)
     if len(completion.text) > MAX_OUTPUT_CHARS:
-        raise ExtractionFailed(OUTPUT_TOO_LONG)
-    raw = _parse_json_object(completion.text)
+        raise _failed(OUTPUT_TOO_LONG, completion)
+    try:
+        raw = _parse_json_object(completion.text)
+    except ExtractionFailed:
+        raise _failed(BAD_JSON, completion) from None
     try:
         # The source hash covers the full original text, not just the window.
         facts = schema.validate(raw, untrusted_text)
     except SchemaViolation:
-        raise ExtractionFailed(SCHEMA_VIOLATION) from None
+        raise _failed(SCHEMA_VIOLATION, completion) from None
     return ExtractionResult(
         facts=facts,
         input_tokens=completion.input_tokens,

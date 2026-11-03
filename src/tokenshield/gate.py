@@ -7,7 +7,8 @@ untrusted text never leaves this module. A kind with no schema is blocked (deny 
 The kind of each item must come from the gateway (message role, tool metadata), never from
 the content itself. Content must not be able to choose its own trust level.
 
-Known gap: tokens spent on extractions that fail are not reported yet.
+Tokens spent by the quarantined model are reported on every result, including blocked ones,
+so the cost of quarantine can be measured honestly. A client error reports no tokens.
 """
 
 from __future__ import annotations
@@ -89,11 +90,25 @@ class GateResult:
     truncated: bool = False
 
 
-def _blocked(kind: SourceKind, digest: str, reason: str) -> GateResult:
+def _blocked(
+    kind: SourceKind,
+    digest: str,
+    reason: str,
+    input_tokens: int | None = None,
+    output_tokens: int | None = None,
+) -> GateResult:
     # Reasons come from fixed constants; the pattern check is defense in depth.
     safe = reason if _REASON_RE.fullmatch(reason) else UNKNOWN_REASON
     text = f"[TS-BLOCKED kind={kind.value} source={digest[:12]} reason={safe}]"
-    return GateResult(Action.BLOCKED, kind, text, digest, reason=safe)
+    return GateResult(
+        Action.BLOCKED,
+        kind,
+        text,
+        digest,
+        reason=safe,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
 
 
 def apply_gate(client: LLMClient, policy: GatePolicy, item: ContentItem) -> GateResult:
@@ -106,7 +121,7 @@ def apply_gate(client: LLMClient, policy: GatePolicy, item: ContentItem) -> Gate
     try:
         result = extract(client, schema, item.text, max_chars=policy.max_chars)
     except ExtractionFailed as exc:
-        return _blocked(item.kind, digest, exc.reason)
+        return _blocked(item.kind, digest, exc.reason, exc.input_tokens, exc.output_tokens)
     return GateResult(
         Action.QUARANTINED,
         item.kind,
