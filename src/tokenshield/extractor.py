@@ -4,6 +4,9 @@ A quarantined model reads the untrusted text. It has no tools, and its raw outpu
 shown to the main model. Only facts that pass the schema leave this module. Every failure
 raises ExtractionFailed: the module never falls back to passing raw text through.
 
+An optional `context` (trusted instructions from our own code, restricted to a safe character
+set) is added to the system prompt. Untrusted text only ever goes between the data markers.
+
 Limits: facts come only from the first max_chars characters of the input, and a typed fact
 can still be wrong (see schema.py). It cannot carry an instruction.
 """
@@ -11,6 +14,7 @@ can still be wrong (see schema.py). It cannot carry an instruction.
 from __future__ import annotations
 
 import json
+import re
 import secrets
 from dataclasses import dataclass
 from typing import Protocol
@@ -25,6 +29,8 @@ LLM_ERROR = "llm_error"
 OUTPUT_TOO_LONG = "output_too_long"
 BAD_JSON = "bad_json"
 SCHEMA_VIOLATION = "schema_violation"
+
+_CONTEXT_RE = re.compile(r"[A-Za-z0-9 .,:;_()/@+\-]{0,800}")
 
 
 @dataclass(frozen=True)
@@ -110,9 +116,12 @@ def _describe_field(spec: FieldSpec) -> str:
     return f'- "{spec.name}": {detail}{suffix}'
 
 
-def build_system_prompt(schema: FactSchema) -> str:
+def build_system_prompt(schema: FactSchema, context: str = "") -> str:
     fields = "\n".join(_describe_field(spec) for spec in schema.fields)
-    return _SYSTEM_TEMPLATE.format(fields=fields)
+    prompt = _SYSTEM_TEMPLATE.format(fields=fields)
+    if context:
+        prompt = f"{prompt}\n\nTrusted task context: {context}"
+    return prompt
 
 
 def _reject_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -150,13 +159,16 @@ def extract(
     untrusted_text: str,
     *,
     max_chars: int = DEFAULT_MAX_CHARS,
+    context: str = "",
 ) -> ExtractionResult:
     if max_chars < 1:
         raise ValueError("max_chars must be positive")
+    if _CONTEXT_RE.fullmatch(context) is None:
+        raise ValueError("invalid context")
     truncated = len(untrusted_text) > max_chars
     window = untrusted_text[:max_chars]
     nonce = secrets.token_hex(8)
-    system = build_system_prompt(schema)
+    system = build_system_prompt(schema, context)
     user = f"<<<DATA {nonce}>>>\n{window}\n<<<END {nonce}>>>"
     try:
         completion = client.complete(system, user)
