@@ -42,12 +42,14 @@ class BifrostChat(BifrostClient):
         limit = self.max_tokens if max_tokens is None else max_tokens
         if limit < 1:
             raise ValueError("max_tokens must be positive")
-        payload = {
+        payload: dict[str, object] = {
             "model": chosen_model,
             "messages": [dict(message) for message in messages],
             "temperature": 0,
             "max_tokens": limit,
         }
+        if self.reasoning_effort is not None:
+            payload["reasoning_effort"] = self.reasoning_effort
         headers = {"Content-Type": "application/json", "x-bf-vk": self._virtual_key}
         try:
             body = json.dumps(payload).encode("utf-8")
