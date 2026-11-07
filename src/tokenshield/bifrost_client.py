@@ -6,6 +6,7 @@ short fixed categories and never contain response content, which may echo untrus
 
 Limits: one request, no retries, no streaming. Reasoning models spend part of max_tokens on
 reasoning, so a low max_tokens can produce an empty answer (the extractor then fails closed).
+reasoning_effort is optional and passed through as-is when set.
 """
 
 from __future__ import annotations
@@ -22,9 +23,11 @@ from tokenshield.extractor import Completion
 
 DEFAULT_BASE_URL = "http://localhost:8080"
 DEFAULT_MODEL = "groq/openai/gpt-oss-20b"
+DEFAULT_QUARANTINE_EFFORT = "low"
 DEFAULT_TIMEOUT = 60.0
 DEFAULT_MAX_TOKENS = 1024
 MAX_RESPONSE_BYTES = 1_000_000
+EFFORTS = frozenset({"low", "medium", "high"})
 
 _URL_RE = re.compile(r"https?://[A-Za-z0-9._\-]+(:\d{1,5})?")
 _KEY_RE = re.compile(r"[A-Za-z0-9._\-]{8,200}")
@@ -93,6 +96,7 @@ class BifrostClient:
         *,
         timeout: float = DEFAULT_TIMEOUT,
         max_tokens: int = DEFAULT_MAX_TOKENS,
+        reasoning_effort: str | None = None,
         transport: Transport | None = None,
     ) -> None:
         base = base_url.rstrip("/")
@@ -106,9 +110,12 @@ class BifrostClient:
             raise ValueError("timeout must be positive")
         if max_tokens < 1:
             raise ValueError("max_tokens must be positive")
+        if reasoning_effort is not None and reasoning_effort not in EFFORTS:
+            raise ValueError("invalid reasoning_effort")
         self.model = model
         self.timeout = timeout
         self.max_tokens = max_tokens
+        self.reasoning_effort = reasoning_effort
         self._url = f"{base}/v1/chat/completions"
         self._virtual_key = virtual_key
         self._transport = transport or _urllib_transport
@@ -117,10 +124,12 @@ class BifrostClient:
     def from_env(
         cls, env: Mapping[str, str], *, transport: Transport | None = None
     ) -> BifrostClient:
+        effort = env.get("TOKENSHIELD_QUARANTINE_EFFORT", DEFAULT_QUARANTINE_EFFORT)
         return cls(
             base_url=env.get("TOKENSHIELD_BIFROST_URL", DEFAULT_BASE_URL),
             virtual_key=env.get("TOKENSHIELD_BIFROST_VK", ""),
             model=env.get("TOKENSHIELD_EXTRACTOR_MODEL", DEFAULT_MODEL),
+            reasoning_effort=None if effort in ("", "default") else effort,
             transport=transport,
         )
 
@@ -128,7 +137,7 @@ class BifrostClient:
         return f"BifrostClient(url={self._url!r}, model={self.model!r})"
 
     def complete(self, system: str, user: str) -> Completion:
-        payload = {
+        payload: dict[str, object] = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system},
@@ -137,6 +146,8 @@ class BifrostClient:
             "temperature": 0,
             "max_tokens": self.max_tokens,
         }
+        if self.reasoning_effort is not None:
+            payload["reasoning_effort"] = self.reasoning_effort
         headers = {"Content-Type": "application/json", "x-bf-vk": self._virtual_key}
         body = json.dumps(payload).encode("utf-8")
         try:
