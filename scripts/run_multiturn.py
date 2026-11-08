@@ -6,6 +6,8 @@
   python scripts/run_multiturn.py --summary --out results/multiturn_pad150.jsonl
 
 --pad adds that many benign changelog lines to every README to make the documents longer.
+--seed-baseline copies finished baseline runs from an earlier results file, so a re-run with
+--modes shielded measures only the shielded side against the same baseline.
 Finished conversations are skipped when you rerun, and failed ones are retried.
 Nothing printed here contains keys or page text.
 """
@@ -27,6 +29,7 @@ from tokenshield.multiturn import (
     run_multiturn,
     summarize_multiturn,
 )
+from tokenshield.seeding import seed_baseline
 
 
 def show(record: ConvRecord) -> None:
@@ -45,6 +48,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--pad", type=int, default=0, help="benign changelog lines to add")
     parser.add_argument("--out", default="results/multiturn.jsonl", help="results file")
     parser.add_argument("--modes", default="baseline,shielded", help="comma-separated modes")
+    parser.add_argument("--seed-baseline", default=None, help="copy finished baseline runs from")
     parser.add_argument("--summary", action="store_true", help="only print the saved summary")
     args = parser.parse_args(argv)
 
@@ -64,6 +68,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
         convos = convos[: args.limit]
     modes = tuple(part.strip() for part in args.modes.split(",") if part.strip())
+
+    if args.seed_baseline:
+        try:
+            copied = seed_baseline(Path(args.seed_baseline), out_path)
+        except ValueError as error:
+            print(f"Bad arguments: {error}")
+            return 1
+        print(f"Copied {copied} finished baseline runs from {args.seed_baseline}")
 
     env = load_env_file(Path(".env"))
     try:
