@@ -6,7 +6,8 @@ from a restricted character set (no spaces, no newlines). Anything else is rejec
 
 Limits: a typed fact can still be wrong (a lying page can claim license=mit), but it cannot
 carry an instruction. Keep schemas small, because every field is information the main model
-is allowed to see.
+is allowed to see. A field's hint is trusted guidance for the quarantined model: it is written
+by us, never taken from content, and limited to a safe character set.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ Value = bool | int | float | str
 
 _NAME_RE = re.compile(r"[a-z][a-z0-9_]{0,31}")
 _TOKEN_RE = re.compile(r"[A-Za-z0-9._:/@+\-]{1,64}")
+_HINT_RE = re.compile(r"[A-Za-z0-9 .,:;_()/@+\-]{0,200}")
 
 
 class SchemaViolation(ValueError):
@@ -49,10 +51,13 @@ class FieldSpec:
     choices: tuple[str, ...] = ()
     min_value: float | None = None
     max_value: float | None = None
+    hint: str = ""
 
     def __post_init__(self) -> None:
         if not _NAME_RE.fullmatch(self.name):
             raise ValueError(f"invalid field name: {self.name!r}")
+        if _HINT_RE.fullmatch(self.hint) is None:
+            raise ValueError(f"{self.name}: unsafe hint")
         if self.type is FieldType.ENUM:
             if not self.choices:
                 raise ValueError(f"{self.name}: enum needs choices")
@@ -168,6 +173,11 @@ README_FACTS = FactSchema(
             choices=("python", "javascript", "typescript", "go", "rust", "java", "other"),
         ),
         FieldSpec("num_code_blocks", FieldType.INT, min_value=0, max_value=10000),
-        FieldSpec("declared_version", FieldType.TOKEN, required=False),
+        FieldSpec(
+            "declared_version",
+            FieldType.TOKEN,
+            required=False,
+            hint="Always include it when the text states a current release or version number.",
+        ),
     ),
 )
