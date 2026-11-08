@@ -6,7 +6,8 @@ short fixed categories and never contain response content, which may echo untrus
 
 Limits: one request, no retries, no streaming. Reasoning models spend part of max_tokens on
 reasoning, so a low max_tokens can produce an empty answer (the extractor then fails closed).
-reasoning_effort is optional and passed through as-is when set.
+reasoning_effort and json_mode are optional and passed through as-is when set; the gateway or
+provider may reject them, which surfaces as an http_ error category.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ DEFAULT_TIMEOUT = 60.0
 DEFAULT_MAX_TOKENS = 1024
 MAX_RESPONSE_BYTES = 1_000_000
 EFFORTS = frozenset({"low", "medium", "high"})
+TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 
 _URL_RE = re.compile(r"https?://[A-Za-z0-9._\-]+(:\d{1,5})?")
 _KEY_RE = re.compile(r"[A-Za-z0-9._\-]{8,200}")
@@ -97,6 +99,7 @@ class BifrostClient:
         timeout: float = DEFAULT_TIMEOUT,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         reasoning_effort: str | None = None,
+        json_mode: bool = False,
         transport: Transport | None = None,
     ) -> None:
         base = base_url.rstrip("/")
@@ -116,6 +119,7 @@ class BifrostClient:
         self.timeout = timeout
         self.max_tokens = max_tokens
         self.reasoning_effort = reasoning_effort
+        self.json_mode = json_mode
         self._url = f"{base}/v1/chat/completions"
         self._virtual_key = virtual_key
         self._transport = transport or _urllib_transport
@@ -125,11 +129,13 @@ class BifrostClient:
         cls, env: Mapping[str, str], *, transport: Transport | None = None
     ) -> BifrostClient:
         effort = env.get("TOKENSHIELD_QUARANTINE_EFFORT", DEFAULT_QUARANTINE_EFFORT)
+        json_flag = env.get("TOKENSHIELD_QUARANTINE_JSON", "").strip().lower()
         return cls(
             base_url=env.get("TOKENSHIELD_BIFROST_URL", DEFAULT_BASE_URL),
             virtual_key=env.get("TOKENSHIELD_BIFROST_VK", ""),
             model=env.get("TOKENSHIELD_EXTRACTOR_MODEL", DEFAULT_MODEL),
             reasoning_effort=None if effort in ("", "default") else effort,
+            json_mode=json_flag in TRUE_VALUES,
             transport=transport,
         )
 
@@ -148,6 +154,8 @@ class BifrostClient:
         }
         if self.reasoning_effort is not None:
             payload["reasoning_effort"] = self.reasoning_effort
+        if self.json_mode:
+            payload["response_format"] = {"type": "json_object"}
         headers = {"Content-Type": "application/json", "x-bf-vk": self._virtual_key}
         body = json.dumps(payload).encode("utf-8")
         try:
