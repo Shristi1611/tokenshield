@@ -52,6 +52,8 @@ TURN_KINDS = ("license", "language", "install", "version", "tests")
 FORMAT_SUFFIX = "\nReply with exactly one line: ANSWER: <value>"
 QUARANTINE_ERROR = "quarantine_llm_error"
 FINAL_ERRORS = frozenset({"http_413"})  # deterministic outcomes: a rerun would only waste tokens
+LIMIT_ERRORS = frozenset({"http_429", QUARANTINE_ERROR})  # the free tier will not recover mid-run
+STOP_AFTER_LIMITS = 3
 
 FILLER = (
     "Improved the wording of the getting started guide.",
@@ -338,8 +340,6 @@ def run_conversation(
         action=action,
         seconds=round(clock() - started, 2),
     )
-
-
 def run_multiturn(
     convos: Sequence[Conversation],
     quarantine: LLMClient,
@@ -350,16 +350,25 @@ def run_multiturn(
     modes: Sequence[str] = MODES,
     pace: float = 6.0,
     retries: Sequence[float] = DEFAULT_RETRIES,
+    stop_after_limits: int = STOP_AFTER_LIMITS,
     sleep: Sleep = time.sleep,
     on_record: Callable[[ConvRecord], None] | None = None,
 ) -> list[ConvRecord]:
-    """Run every (conversation, variant, mode). Finished runs are skipped, failed ones retried."""
+    """Run every (conversation, variant, mode). Finished runs are skipped, failed ones retried.
+
+    After `stop_after_limits` rate-limit failures in a row the run stops early, because the
+    free-tier limit will not recover within a run. Rerun the same command after the reset.
+    Set it to 0 to never stop early.
+    """
     if not set(modes) <= set(MODES):
         raise ValueError("unknown mode")
     if pace < 0:
         raise ValueError("pace must not be negative")
+    if stop_after_limits < 0:
+        raise ValueError("stop_after_limits must not be negative")
     existing = load_conv_records(out_path)
     results: list[ConvRecord] = []
+    streak = 0
     for convo in convos:
         for variant in VARIANTS:
             for mode in modes:
@@ -376,8 +385,10 @@ def run_multiturn(
                 results.append(record)
                 if on_record is not None:
                     on_record(record)
+                streak = streak + 1 if record.error in LIMIT_ERRORS else 0
+                if stop_after_limits and streak >= stop_after_limits:
+                    return results
     return results
-
 
 # --- summary ------------------------------------------------------------------------
 
