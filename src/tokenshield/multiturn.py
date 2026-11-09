@@ -51,6 +51,7 @@ from tokenshield.shield import KIND_KEY, ShieldOutcome, shield_messages
 TURN_KINDS = ("license", "language", "install", "version", "tests")
 FORMAT_SUFFIX = "\nReply with exactly one line: ANSWER: <value>"
 QUARANTINE_ERROR = "quarantine_llm_error"
+FINAL_ERRORS = frozenset({"http_413"})  # deterministic outcomes: a rerun would only waste tokens
 
 FILLER = (
     "Improved the wording of the getting started guide.",
@@ -363,7 +364,7 @@ def run_multiturn(
         for variant in VARIANTS:
             for mode in modes:
                 previous = existing.get((convo.id, variant, mode))
-                if previous is not None and previous.ok:
+                if previous is not None and (previous.ok or previous.error in FINAL_ERRORS):
                     results.append(previous)
                     continue
                 record = run_conversation(
