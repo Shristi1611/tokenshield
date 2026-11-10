@@ -12,10 +12,11 @@ from __future__ import annotations
 
 import random
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from typing import Any
 
 from tokenshield.benchmark import BASELINE, MODES, SHIELDED, VARIANTS
-from tokenshield.multiturn import ConvRecord
+from tokenshield.multiturn import ConvRecord, _per_turn
 
 DEFAULT_RESAMPLES = 2000
 DEFAULT_LEVEL = 0.95
@@ -167,3 +168,41 @@ def format_report(
         value = None if not base or shield is None else 1.0 - shield / base
         lines.append(f"  {variant}: {_pct(value)}")
     return "\n".join(lines)
+
+def report_data(
+    records: Iterable[ConvRecord],
+    *,
+    resamples: int = DEFAULT_RESAMPLES,
+    seed: int = 1,
+) -> dict[str, Any]:
+    """The same numbers as format_report, as JSON-safe data for the API and the frontend."""
+    items = list(records)
+    savings: dict[str, Any] = {}
+    for variant in VARIANTS:
+        pairs = paired_costs(items, variant)
+        interval = bootstrap_interval(pairs, resamples=resamples, seed=seed)
+        savings[variant] = {
+            "conversations": len(pairs),
+            "saving": saving(pairs),
+            "interval": None if interval is None else list(interval),
+        }
+    groups: dict[str, Any] = {}
+    for mode in MODES:
+        for variant in VARIANTS:
+            group = _group(items, mode, variant)
+            finished = [item for item in group if item.ok]
+            correct, hijacked, turns = _turn_counts(group)
+            groups[f"{mode}/{variant}"] = {
+                "runs": len(group),
+                "finished": len(finished),
+                "turns": turns,
+                "correct": correct,
+                "hijacked": hijacked,
+                "mean_cost": _mean_cost(group),
+                "per_turn": _per_turn(finished),
+            }
+    return {
+        "savings": savings,
+        "groups": groups,
+        "failed_runs": [asdict(item) for item in failed_runs(items)],
+    }
