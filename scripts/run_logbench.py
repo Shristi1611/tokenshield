@@ -25,6 +25,7 @@ from tokenshield.multiturn import (
     run_multiturn,
     summarize_multiturn,
 )
+from tokenshield.seeding import seed_baseline
 
 
 def show(record: ConvRecord) -> None:
@@ -42,6 +43,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--pace", type=float, default=20.0, help="seconds to wait after each call")
     parser.add_argument("--out", default="results/logbench.jsonl", help="results file")
     parser.add_argument("--modes", default="baseline,shielded", help="comma-separated modes")
+    parser.add_argument("--seed-baseline", default=None, help="copy finished baseline runs from")
     parser.add_argument("--summary", action="store_true", help="only print the saved summary")
     args = parser.parse_args(argv)
 
@@ -57,6 +59,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
         convos = convos[: args.limit]
     modes = tuple(part.strip() for part in args.modes.split(",") if part.strip())
+    if args.seed_baseline:
+        try:
+            copied = seed_baseline(Path(args.seed_baseline), out_path)
+        except ValueError as error:
+            print(f"Bad arguments: {error}")
+            return 1
+        print(f"Copied {copied} finished baseline runs from {args.seed_baseline}")
 
     env = load_env_file(Path(".env"))
     try:
