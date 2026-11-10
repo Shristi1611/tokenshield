@@ -51,6 +51,8 @@ from tokenshield.freshness import (
 )
 from tokenshield.gate import GatePolicy
 from tokenshield.meter import MAIN, QUARANTINE, TokenMeter
+from tokenshield.multiturn import load_conv_records
+from tokenshield.reporting import report_data
 from tokenshield.shield import KIND_KEY, ItemReport, shield_messages
 from tokenshield.tavily_client import TavilyClient
 
@@ -61,6 +63,12 @@ MAX_QUESTION_CHARS = 1_000
 MAX_DOCUMENT_CHARS = 20_000
 MAX_ANSWER_CHARS = 8_000
 EXCERPT_CHARS = 1_500
+RESULT_SUITES = {
+    "readme_long": ("multiturn_pad150_v2.jsonl",),
+    "readme_short": ("multiturn_pad0.jsonl",),
+    "logs": ("logbench_v2.jsonl", "logbench.jsonl"),
+    "flip": ("flipbench.jsonl",),
+}
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost"})
 DEFAULT_ORIGINS = frozenset(
     {
@@ -161,18 +169,21 @@ class ApiService:
         *,
         max_checked: int = 2,
         results_per_claim: int = 2,
+        results_dir: Path | None = None,
     ) -> None:
         self._quarantine = quarantine
         self._chat = chat
         self._search = search
         self._policy = policy
         self._results_path = results_path
+        self._results_dir = results_dir if results_dir is not None else results_path.parent
         self._max_checked = max_checked
         self._results_per_claim = results_per_claim
         self.live_lock = threading.Lock()
         self._routes: dict[str, tuple[str, Callable[[object], Body]]] = {
             "/health": ("GET", self._health),
             "/api/benchmark": ("GET", self._benchmark),
+            "/api/results": ("GET", self._results),
             "/api/shield": ("POST", self._shield),
             "/api/compare": ("POST", self._compare),
             "/api/freshness": ("POST", self._freshness),
@@ -243,6 +254,19 @@ class ApiService:
             for record in sorted(records, key=lambda record: record.key)
         ]
         return {"available": True, "summary": summarize(records), "runs": runs}
+
+    def _results(self, _payload: object) -> Body:
+        suites: Body = {}
+        for label, names in RESULT_SUITES.items():
+            for name in names:
+                path = self._results_dir / name
+                if not path.exists():
+                    continue
+                records = list(load_conv_records(path).values())
+                if records:
+                    suites[label] = {"file": name, **report_data(records)}
+                break
+        return {"available": bool(suites), "suites": suites}
 
     def _shield(self, payload: object) -> Body:
         data = _mapping(payload)
