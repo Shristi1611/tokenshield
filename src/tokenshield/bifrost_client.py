@@ -27,6 +27,7 @@ DEFAULT_MODEL = "groq/openai/gpt-oss-20b"
 DEFAULT_QUARANTINE_EFFORT = "low"
 DEFAULT_TIMEOUT = 60.0
 DEFAULT_MAX_TOKENS = 1024
+DEFAULT_QUARANTINE_MAX_TOKENS = 2048
 MAX_RESPONSE_BYTES = 1_000_000
 EFFORTS = frozenset({"low", "medium", "high"})
 TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
@@ -130,10 +131,16 @@ class BifrostClient:
     ) -> BifrostClient:
         effort = env.get("TOKENSHIELD_QUARANTINE_EFFORT", DEFAULT_QUARANTINE_EFFORT)
         json_flag = env.get("TOKENSHIELD_QUARANTINE_JSON", "").strip().lower()
+        raw_tokens = env.get("TOKENSHIELD_QUARANTINE_MAX_TOKENS", "").strip()
+        try:
+            max_tokens = int(raw_tokens) if raw_tokens else DEFAULT_QUARANTINE_MAX_TOKENS
+        except ValueError:
+            raise ValueError("invalid max_tokens") from None
         return cls(
             base_url=env.get("TOKENSHIELD_BIFROST_URL", DEFAULT_BASE_URL),
             virtual_key=env.get("TOKENSHIELD_BIFROST_VK", ""),
             model=env.get("TOKENSHIELD_EXTRACTOR_MODEL", DEFAULT_MODEL),
+            max_tokens=max_tokens,
             reasoning_effort=None if effort in ("", "default") else effort,
             json_mode=json_flag in TRUE_VALUES,
             transport=transport,
