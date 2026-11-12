@@ -1,84 +1,98 @@
-# tokenshield
+# TokenShield
 
 **A trust boundary for LLM agents: typed facts in, token traps out.**
 
-> **Status: research prototype, work in progress.** Built for the Global AI Hackathon (Bifrost priority track + Tavily track). Nothing below is benchmarked yet. Results sections are empty until the numbers exist.
+Agents read untrusted text: READMEs, build logs, web pages, search results. Any of it can tell the agent to do something else, to burn thousands of tokens doing it, or to state something false. TokenShield sits between that text and your main model. A cheap, quarantined model reads the untrusted text alone and may only return a small set of **typed, bounded fields**. The main model never sees the raw text, only a block of validated facts.
 
-## The problem
+It runs as a **standalone, OpenAI-compatible gateway in front of [Bifrost](https://github.com/maximhq/bifrost)**. It is not a Bifrost plugin. A second pipeline uses **Tavily** to check whether an answer is still true.
 
-Agents read untrusted content: READMEs, issue text, web pages, search results, tool output, third-party skill docs. That content can carry instructions that push the agent into long, pointless work. Published research shows how big the effect can get:
+Built for the Geek Room Global AI Hackathon (Bifrost track and Tavily track, one integrated project).
 
-- Skill injection into coding agents reached up to 75.86x token amplification on single tasks (SkillBloat).
-- Decoy reasoning problems planted in web content caused up to 18x to 46x slowdowns on reasoning models (OverThink).
-- Malicious agent skills drove roughly 6x to 9x token drain in a real agent deployment (Clawdrain).
-
-The usual defense is a flat token cap or timeout. A flat cap stops a runaway run, but an attacker can simply spend up to the cap every time, and the cap says nothing about which content caused the burn.
-
-Strong injection defenses also exist, but they cost tokens. CaMeL, for example, reports a median of about 2.8x input tokens and 2.7x output tokens versus plain tool calling.
-
-## The idea
-
-Treat untrusted content as quarantined by default. If the main model only ever sees small typed facts extracted from that content, two things should follow:
-
-1. Injected instructions in the raw text never reach the main model.
-2. The context the main model carries gets smaller, because a long page becomes a few typed fields.
-
-**Hypothesis (unproven):** this can be made both safer and cheaper than a naive agent. The benchmark below exists to test that, including the case where it turns out false.
-
-## Three layers
+## What it does
 
 | Layer | What it does | Status |
 |---|---|---|
-| 1. Quarantine as compression | Untrusted content is reduced to typed facts by a cheap model. The main model never sees the raw text. | Planned (core) |
-| 2. Conformal token budgets | Learns normal token spend per task type and stage, then sets budgets from calibrated quantiles with a target false-alarm rate. | Planned |
-| 3. Shared trap advisories | When one agent hits a token trap, the content hash is recorded so other agents behind the gateway skip it. | Planned (stretch) |
-
-```mermaid
-flowchart LR
-    A[Agent fetches content] --> B{Layer 3: known trap?}
-    B -- yes --> X[Skip source]
-    B -- no --> C[Layer 1: quarantine and typed extraction]
-    C --> D[Main model sees typed facts only]
-    D --> E[Layer 2: budget monitor]
-    E -- over budget --> F[Degrade or stop]
-    E -- ok --> G[Task result]
-```
-
-## Where it plugs in
-
-- **Bifrost:** a gateway plugin using the request hooks (PreHook and PostHook) and MCP hooks for tool-call governance. Bifrost plugins are written in Go, so the plan may include a Python sidecar service that the plugin calls.
-- **Tavily:** search and extract results are untrusted web content, so they pass through Layer 1 before reaching the model.
-
-## Evaluation plan
-
-A small benchmark of clean and poisoned tasks built for this project, using only benign, sandboxed token-burn content.
-
-| Metric | Why it matters |
-|---|---|
-| Token amplification factor (poisoned vs clean) | Does the attack work against the baseline? |
-| Tokens vs baseline agent | Does quarantine actually save tokens? |
-| Task success rate | Did safety cost correctness? |
-| False-alarm rate on clean tasks | Do the budgets flag legitimate work? |
+| 1. Typed-fact quarantine | Untrusted text goes to a quarantined model. Its JSON is checked against a strict schema (booleans, bounded numbers, enums, restricted tokens, no free text). Any error fails closed to a fixed `[TS-BLOCKED]` placeholder. | Built, benchmarked |
+| 2. Conformal token budgets | Split-conformal threshold (alpha 0.1) learned from clean runs; runs above it are flagged. | Measured in the API; enforced per session in the gateway only |
+| 3. Trap advisories | Shared warnings about known token traps. | Designed, not a headline result |
+| Freshness check (Tavily) | Extracts time-sensitive claims from an answer, searches Tavily per claim, quarantines the results like any other untrusted text, and computes the verdict in code. | Works end to end; precision and recall **not measured** |
 
 ## Results
 
-*Not available yet.*
+All results are **token counts** on the Groq free tier, on **templated documents** (READMEs and build logs generated from templates). Intervals are 95% bootstrap intervals over conversations: they show run-to-run spread, not real-world variance. No dollar savings are claimed.
 
-## Limitations (known in advance)
+**Long multi-turn conversations (10 READMEs x 5 turns, padded README):**
 
-- Typed extraction loses information. Coding agents sometimes need raw text, so repo code stays outside the quarantine path.
-- Quarantine adds a cheap-model call of its own. It must be shown to be a net saving.
-- The benchmark is small and self-built, so numbers will be indicative, not definitive.
-- A solo hackathon prototype is not a production security product.
+| | Plain agent | TokenShield |
+|---|---|---|
+| Mean tokens, clean | 9,881 | 4,028 |
+| Mean tokens, attacked | 11,315 | 4,049 |
+| Saved, clean | | +59.2% (58.9% to 59.5%) |
+| Saved, attacked | | +64.2% (60.2% to 69.0%) |
+| Turns hijacked under attack | 6 of 50 | 0 of 50 |
+| Turns correct, attacked | 50 of 50 | 48 of 50 |
 
-## Related work
+**Build logs (first 5 of 10 finished cleanly; the rest hit free-tier rate limits or a gateway outage and are counted as failed runs):** +57.3% clean (54.7% to 59.5%), +69.8% attacked (61.2% to 75.8%, 3 pairs). One plain-agent run hit an `http_413` after 24,252 tokens. One later log (l06) was blocked in the shielded poisoned run.
 
-CaMeL (control and data flow separation), TracLLM and AttnTrace (context traceback), OverThink, SkillBloat and Clawdrain (token amplification attacks). This project does not claim to invent the dual-model pattern. The goal is a black-box gateway implementation, measured on token cost as well as security.
+**Token amplification under attack** (attacked cost / clean cost): plain agent 1.08x to 2.28x depending on the set, shielded about 1.00x.
 
-## Repository layout
+## Where it falls short
 
-Planned, will be updated as files land.
+We report these on purpose.
 
-## Quick start
+- **Short tasks cost more.** On single-question tasks with short documents the shield used about 2.6x more tokens (the quarantine call is overhead). The savings come from long conversations, where a plain agent re-sends the document every turn.
+- **It stops instructions, not lies.** On the answer-flip test (a planted false license or version, no instructions) the shield was *less* accurate under attack: 17 of 30 correct against 23 of 30 for the plain agent. A typed-fact quarantine cannot tell a planted false fact from a true one.
+- **Denial of service.** If the quarantined model is hijacked into prose or an oversized reply, extraction fails closed and the main model sees only a placeholder. That is safe, but the user gets less.
+- **Templated documents.** Real documents will vary more than our templates do.
+- **Free-tier noise.** Rate limits cut some runs short. Failed runs are reported with their spend, not dropped.
+- **Freshness is unmeasured.** There is no labelled precision/recall number for the Tavily check yet.
+- **Layer 2 is enforced only in the gateway**, not in the API pipeline.
 
-Coming once there is something to run.
+## How Bifrost and Tavily are used
+
+- **Bifrost** runs in Docker on `localhost:8080`. Both the quarantine model and the main model are called through it with one virtual key (`x-bf-vk`). TokenShield's own gateway exposes `POST /v1/chat/completions` on `localhost:8766`, shields untrusted messages, forwards to Bifrost, and meters tokens per session (optional `X-Tokenshield-Session` header and budget). It refuses any request carrying an `Origin` header.
+- **Tavily** supplies fresh evidence per claim. Search results are untrusted, so they pass through the same quarantine and typed schema as a README. At most 2 claims per answer and 2 results per claim are checked, to keep credits low.
+- Whether a standalone layer in front of Bifrost counts for the Bifrost track's problem #4 has not been confirmed with the organizers.
+
+## Run it
+
+Requires Python 3.12, Docker, a Groq key configured in Bifrost, and a Tavily key.
+
+```
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e ".[dev]"
+
+:: Bifrost (settings and keys go in .env, which is gitignored)
+docker run --name bifrost -p 8080:8080 --env-file .env -v "%cd%\bifrost-data:/app/data" maximhq/bifrost
+:: later: docker start bifrost
+
+python scripts\run_api.py        :: API on 127.0.0.1:8765
+python scripts\run_gateway.py    :: gateway on 127.0.0.1:8766 (optional)
+
+cd frontend
+python -m http.server 3000       :: then open http://localhost:3000
+```
+
+The API only accepts pages served from `localhost:5173` or `localhost:3000`; for another port set `TOKENSHIELD_ALLOWED_ORIGINS`. Keys live only in `.env` and the Bifrost UI, never in the repo. The Tavily key is read as in `scripts\check_tavily.py`.
+
+Tests and lint: `pytest -q` and `ruff check src tests scripts`.
+
+Reproduce the benchmarks (each run spends free-tier tokens): `scripts\run_benchmark.py`, `run_multiturn.py`, `run_logbench.py`, `run_flipbench.py`, then `scripts\report.py results\<file>.jsonl`. Raw results are in `results/` and are kept as evidence, including failed and rate-limited attempts.
+
+## Frontend
+
+`frontend/index.html` is a single static page: attacks, defenses, a live simulator (plain agent vs TokenShield, through your local API), results, and details. If the API is not reachable it replays clearly labelled recorded runs from `results/`. Model output and web text are rendered as plain text, never as HTML.
+
+## Layout
+
+```
+src/tokenshield/   schema, extractor, gate, shield, meter, chat, bifrost_client,
+                   tavily_client, freshness, budget, benchmarks, reporting, api, gateway
+scripts/           runners, probes, demos
+tests/             unit tests for all of the above
+results/           raw benchmark records (jsonl)
+frontend/          the web page
+```
+
+No license file is included.
