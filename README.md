@@ -32,20 +32,40 @@ All results are **token counts** on the Groq free tier, on **templated documents
 | Turns hijacked under attack | 6 of 50 | 0 of 50 |
 | Turns correct, attacked | 50 of 50 | 48 of 50 |
 
-**Build logs (first 5 of 10 finished cleanly; the rest hit free-tier rate limits or a gateway outage and are counted as failed runs):** +57.3% clean (54.7% to 59.5%), +69.8% attacked (61.2% to 75.8%, 3 pairs). One plain-agent run hit an `http_413` after 24,252 tokens. One later log (l06) was blocked in the shielded poisoned run.
+**Build logs (all 10 finished, 1 failed run counted at its spend):**
 
-**Token amplification under attack** (attacked cost / clean cost): plain agent 1.08x to 2.28x depending on the set, shielded about 1.00x.
+| | Plain agent | TokenShield |
+|---|---|---|
+| Saved, clean | | +57.0% (54.4% to 59.2%) |
+| Saved, attacked | | +65.9% (59.3% to 71.6%, 9 pairs); +70.2% counting the failed run |
+| Turns correct, clean | 46 of 50 | 49 of 50 |
+| Turns correct, attacked | 40 of 45 | 43 of 50 |
+| Turns hijacked under attack | 4 of 45 | 0 of 50 |
+
+One plain-agent log hit an `http_413` after 24,252 tokens. One log (l06) was blocked by the shield in the attacked run and scored 0 of 5. Under attack the shielded accuracy (86%) was slightly below the plain agent's (89%).
+
+**Answer flip (6 READMEs x 5 turns, planted false fact, no instructions):**
+
+| | Plain agent | TokenShield, first run | TokenShield, with anchor hints |
+|---|---|---|---|
+| Turns correct, attacked | 23 of 30 | 17 of 30 | 27 of 30 |
+| Turns correct, clean | 30 of 30 | 30 of 30 | 30 of 30 |
+
+The hints were tuned on this template (see below).
+
+**Token amplification under attack** (attacked cost / clean cost): plain agent 1.08x to 2.28x depending on the set (1.37x on the logs), shielded about 1.00x to 1.04x.
 
 ## Where it falls short
 
 We report these on purpose.
 
 - **Short tasks cost more.** On single-question tasks with short documents the shield used about 2.6x more tokens (the quarantine call is overhead). The savings come from long conversations, where a plain agent re-sends the document every turn.
-- **It stops instructions, not lies.** On the answer-flip test (a planted false license or version, no instructions) the shield was *less* accurate under attack: 17 of 30 correct against 23 of 30 for the plain agent. A typed-fact quarantine cannot tell a planted false fact from a true one.
+- **Planted false facts were a weakness.** On the answer-flip test (a planted false license or version, no instructions) the shield first scored 17 of 30 correct under attack, against 23 of 30 for the plain agent. After we added anchor hints (telling the quarantined model which section to trust for license and version) it scored 27 of 30 (clean: 30 of 30). The hints were written after seeing this template fail, so this is not a held-out test, it is one run of 30 turns, and the plain-agent baseline is from the first run. A typed-fact quarantine still cannot in general tell a planted false fact from a true one.
 - **Denial of service.** If the quarantined model is hijacked into prose or an oversized reply, extraction fails closed and the main model sees only a placeholder. That is safe, but the user gets less.
 - **Templated documents.** Real documents will vary more than our templates do.
 - **Free-tier noise.** Rate limits cut some runs short. Failed runs are reported with their spend, not dropped.
 - **Freshness is unmeasured.** There is no labelled precision/recall number for the Tavily check yet.
+- **Anchor hints were only measured on the answer-flip test.** Three of the log runs (l07, l08, l10) used them and the rest did not; the README benchmarks were not rerun with them.
 - **Layer 2 is enforced only in the gateway**, not in the API pipeline.
 
 ## How Bifrost and Tavily are used
