@@ -70,8 +70,7 @@ docker run --name bifrost -p 8080:8080 --env-file .env -v "%cd%\bifrost-data:/ap
 python scripts\run_api.py        :: API on 127.0.0.1:8765
 python scripts\run_gateway.py    :: gateway on 127.0.0.1:8766 (optional)
 
-cd frontend
-python -m http.server 3000       :: then open http://localhost:3000
+python -m http.server 3000       :: from the repo root, then open http://localhost:3000
 ```
 
 The API only accepts pages served from `localhost:5173` or `localhost:3000`; for another port set `TOKENSHIELD_ALLOWED_ORIGINS`. Keys live only in `.env` and the Bifrost UI, never in the repo. The Tavily key is read as in `scripts\check_tavily.py`.
@@ -82,7 +81,7 @@ Reproduce the benchmarks (each run spends free-tier tokens): `scripts\run_benchm
 
 ## Frontend
 
-`frontend/index.html` is a single static page: attacks, defenses, a live simulator (plain agent vs TokenShield, through your local API), results, and details. If the API is not reachable it replays clearly labelled recorded runs from `results/`. Model output and web text are rendered as plain text, never as HTML.
+`index.html` (repo root, so GitHub Pages can serve it) is a single static page: attacks, defenses, a live simulator (plain agent vs TokenShield, through your local API), results, and details. If the API is not reachable (for example on the hosted GitHub Pages version, where visitors have no local API) it replays clearly labelled recorded runs from `results/`. Live runs need the local setup above. Model output and web text are rendered as plain text, never as HTML.
 
 ## Layout
 
@@ -92,7 +91,7 @@ src/tokenshield/   schema, extractor, gate, shield, meter, chat, bifrost_client,
 scripts/           runners, probes, demos
 tests/             unit tests for all of the above
 results/           raw benchmark records (jsonl)
-frontend/          the web page
+index.html         the web page (repo root)
 ```
 
 No license file is included.
