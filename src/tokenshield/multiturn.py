@@ -23,6 +23,17 @@ from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Any
 
+from tokenshield.baselines import (
+    ALL_MODES,
+    DELIMITED,
+    DELIMITED_SYSTEM,
+    SUMMARIZED,
+    SUMMARIZED_SYSTEM,
+    SUMMARY_ACTION,
+    SUMMARY_SYSTEM,
+    summary_block,
+    wrap_document,
+)
 from tokenshield.benchmark import (
     BASELINE,
     CLEAN,
@@ -116,13 +127,19 @@ def build_conversations(pad_lines: int = 0) -> tuple[Conversation, ...]:
 def initial_messages(convo: Conversation, variant: str, mode: str) -> list[dict[str, object]]:
     if variant not in VARIANTS:
         raise ValueError("unknown variant")
-    if mode not in MODES:
+    if mode not in ALL_MODES:
         raise ValueError("unknown mode")
     readme = convo.readme_poisoned if variant == POISONED else convo.readme_clean
+    if mode == DELIMITED:
+        return [
+            {"role": "system", "content": DELIMITED_SYSTEM},
+            {"role": "user", "content": wrap_document(readme)},
+        ]
+    system = SUMMARIZED_SYSTEM if mode == SUMMARIZED else SYSTEM_PROMPT
     document: dict[str, object] = {"role": "user", "content": readme}
     if mode == SHIELDED:
         document[KIND_KEY] = "file"
-    return [{"role": "system", "content": SYSTEM_PROMPT}, document]
+    return [{"role": "system", "content": system}, document]
 
 
 # --- records ------------------------------------------------------------------------
@@ -239,6 +256,37 @@ def _shield_with_retries(
         sleep(retries[attempts - 1])
 
 
+def _summarize_with_retries(
+    summarizer: LLMClient,
+    document: str,
+    label: str,
+    retries: Sequence[float],
+    sleep: Sleep,
+) -> tuple[str | None, TokenMeter, int]:
+    """Summarize the document once with the cheap model, retrying when that call fails."""
+    wasted = 0
+    attempts = 0
+    while True:
+        attempts += 1
+        meter = TokenMeter()
+        text: str | None = None
+        try:
+            completion = summarizer.complete(SUMMARY_SYSTEM, wrap_document(document))
+        except Exception:  # noqa: BLE001 - a failed call only costs a retry, never raw text
+            meter.record(label, QUARANTINE, False)
+        else:
+            text = completion.text.strip() if isinstance(completion.text, str) else ""
+            meter.record(
+                label, QUARANTINE, bool(text), completion.input_tokens, completion.output_tokens
+            )
+        if text:
+            return text, meter, wasted
+        wasted += meter.totals().total_tokens
+        if attempts > len(retries):
+            return None, meter, wasted
+        sleep(retries[attempts - 1])
+
+
 def _ask(
     main: ChatClient,
     messages: Sequence[dict[str, object]],
@@ -272,6 +320,7 @@ def run_conversation(
     pace: float = 0.0,
     sleep: Sleep = time.sleep,
     clock: Clock = time.perf_counter,
+    summarizer: LLMClient | None = None,
 ) -> ConvRecord:
     base = initial_messages(convo, variant, mode)
     label = f"{convo.id}:{variant}:{mode}"
@@ -292,6 +341,17 @@ def run_conversation(
             history = [dict(message) for message in outcome.messages]
             file_items = [item for item in outcome.items if item.kind is SourceKind.FILE]
             action = file_items[0].action.value if file_items else None
+            if pace > 0:
+                sleep(pace)
+    elif mode == SUMMARIZED:
+        summary, quarantine_meter, wasted = _summarize_with_retries(
+            summarizer or quarantine, str(base[1]["content"]), label, retries, sleep
+        )
+        if summary is None:
+            error = QUARANTINE_ERROR
+        else:
+            history = [dict(base[0]), {"role": "user", "content": summary_block(summary)}]
+            action = SUMMARY_ACTION
             if pace > 0:
                 sleep(pace)
     else:
@@ -340,6 +400,8 @@ def run_conversation(
         action=action,
         seconds=round(clock() - started, 2),
     )
+
+
 def run_multiturn(
     convos: Sequence[Conversation],
     quarantine: LLMClient,
@@ -353,6 +415,7 @@ def run_multiturn(
     stop_after_limits: int = STOP_AFTER_LIMITS,
     sleep: Sleep = time.sleep,
     on_record: Callable[[ConvRecord], None] | None = None,
+    summarizer: LLMClient | None = None,
 ) -> list[ConvRecord]:
     """Run every (conversation, variant, mode). Finished runs are skipped, failed ones retried.
 
@@ -360,7 +423,7 @@ def run_multiturn(
     free-tier limit will not recover within a run. Rerun the same command after the reset.
     Set it to 0 to never stop early.
     """
-    if not set(modes) <= set(MODES):
+    if not set(modes) <= set(ALL_MODES):
         raise ValueError("unknown mode")
     if pace < 0:
         raise ValueError("pace must not be negative")
@@ -378,7 +441,7 @@ def run_multiturn(
                     continue
                 record = run_conversation(
                     convo, variant, mode, quarantine, main, policy,
-                    retries=retries, pace=pace, sleep=sleep,
+                    retries=retries, pace=pace, sleep=sleep, summarizer=summarizer,
                 )
                 append_conv_record(out_path, record)
                 existing[record.key] = record
@@ -389,6 +452,7 @@ def run_multiturn(
                 if stop_after_limits and streak >= stop_after_limits:
                     return results
     return results
+
 
 # --- summary ------------------------------------------------------------------------
 

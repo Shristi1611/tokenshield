@@ -1,13 +1,18 @@
 """Run the multi-turn benchmark against the live gateway. Resumable and paced for free-tier limits.
 
-  python scripts/run_multiturn.py --limit 1                                  (smoke run)
-  python scripts/run_multiturn.py --limit 3 --out results/multiturn_pad0.jsonl
+  python scripts/run_multiturn.py --limit 1
   python scripts/run_multiturn.py --limit 3 --pad 150 --pace 25 --out results/multiturn_pad150.jsonl
   python scripts/run_multiturn.py --summary --out results/multiturn_pad150.jsonl
 
---pad adds that many benign changelog lines to every README to make the documents longer.
---seed-baseline copies finished baseline runs from an earlier results file, so a re-run with
---modes shielded measures only the shielded side against the same baseline.
+Real documents and the two extra baselines (delimited prompt, summarize-then-answer):
+
+  python scripts/run_multiturn.py --docs data/realdocs --limit 3 --modes baseline,delimited,summarized,shielded --out results/real_smoke.jsonl
+  python scripts/run_multiturn.py --docs data/realdocs --attack flip --out results/real_flip.jsonl
+
+--docs loads the hand-labelled real READMEs. --attack is burn or flip (false license).
+--max-chars skips real documents longer than that. --pad does not apply to real documents.
+--pad adds benign changelog lines to every templated README.
+--seed-baseline copies finished baseline runs from an earlier results file.
 Finished conversations are skipped when you rerun, and failed ones are retried.
 Nothing printed here contains keys or page text.
 """
@@ -18,9 +23,11 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
+from tokenshield.baselines import EXTRA_MODES
 from tokenshield.benchmark import DEFAULT_MAIN_MODEL, default_policy
 from tokenshield.bifrost_client import DEFAULT_BASE_URL, BifrostClient, load_env_file
 from tokenshield.chat import BifrostChat
+from tokenshield.compare import compare_modes, format_comparison
 from tokenshield.multiturn import (
     ConvRecord,
     build_conversations,
@@ -29,7 +36,16 @@ from tokenshield.multiturn import (
     run_multiturn,
     summarize_multiturn,
 )
+from tokenshield.realdocs import ATTACKS, BURN, build_real_conversations, load_documents
 from tokenshield.seeding import seed_baseline
+
+
+def print_summary(path: Path) -> None:
+    records = list(load_conv_records(path).values())
+    print(format_multiturn(summarize_multiturn(records)))
+    if any(record.mode in EXTRA_MODES for record in records):
+        print()
+        print(format_comparison(compare_modes(records)))
 
 
 def show(record: ConvRecord) -> None:
@@ -46,6 +62,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=None, help="only the first N READMEs")
     parser.add_argument("--pace", type=float, default=6.0, help="seconds to wait after each call")
     parser.add_argument("--pad", type=int, default=0, help="benign changelog lines to add")
+    parser.add_argument("--docs", default=None, help="folder of real documents (data/realdocs)")
+    parser.add_argument("--attack", default=BURN, choices=ATTACKS, help="attack for --docs")
+    parser.add_argument("--max-chars", type=int, default=None, help="skip longer real documents")
     parser.add_argument("--out", default="results/multiturn.jsonl", help="results file")
     parser.add_argument("--modes", default="baseline,shielded", help="comma-separated modes")
     parser.add_argument("--seed-baseline", default=None, help="copy finished baseline runs from")
@@ -54,12 +73,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     out_path = Path(args.out)
     if args.summary:
-        print(format_multiturn(summarize_multiturn(load_conv_records(out_path).values())))
+        print_summary(out_path)
         return 0
 
     try:
-        convos = build_conversations(args.pad)
-    except ValueError as error:
+        if args.docs:
+            documents = load_documents(Path(args.docs), max_chars=args.max_chars)
+            convos = build_real_conversations(documents, args.attack)
+        else:
+            convos = build_conversations(args.pad)
+    except (ValueError, OSError) as error:
         print(f"Bad arguments: {error}")
         return 1
     if args.limit is not None:
@@ -80,6 +103,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     env = load_env_file(Path(".env"))
     try:
         quarantine = BifrostClient.from_env(env)
+        summarizer = BifrostClient.from_env(env)
+        summarizer.json_mode = False  # the summary is plain text, never JSON
         chat = BifrostChat(
             env.get("TOKENSHIELD_BIFROST_URL", DEFAULT_BASE_URL),
             env.get("TOKENSHIELD_BIFROST_VK", ""),
@@ -90,11 +115,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Setup failed: {error}")
         return 1
 
-    print(f"Running {len(convos)} READMEs (pad {args.pad}), modes {', '.join(modes)}, out {out_path}")
+    print(f"Running {len(convos)} documents (pad {args.pad}), modes {', '.join(modes)}, out {out_path}")
     try:
         run_multiturn(
             convos, quarantine, chat, default_policy(), out_path,
-            modes=modes, pace=args.pace, on_record=show,
+            modes=modes, pace=args.pace, on_record=show, summarizer=summarizer,
         )
     except KeyboardInterrupt:
         print("Interrupted. Finished conversations are saved; rerun the same command to resume.")
@@ -103,7 +128,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     print()
-    print(format_multiturn(summarize_multiturn(load_conv_records(out_path).values())))
+    print_summary(out_path)
     return 0
 
 

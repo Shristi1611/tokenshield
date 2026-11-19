@@ -1,0 +1,182 @@
+[
+  {
+    "repo": "psf/requests",
+    "slug": "psf__requests",
+    "chars": 2894,
+    "sha256": "2a9268c9be5f4dc9abe9105740be7c5234babc3dd2b25eb11ca376c538a0c67b"
+  },
+  {
+    "repo": "Textualize/rich",
+    "slug": "Textualize__rich",
+    "chars": 16906,
+    "sha256": "2f68e0e5b36f088e4059f08717454bfca47691b0188a278c7966eef6205c0d63"
+  },
+  {
+    "repo": "encode/httpx",
+    "slug": "encode__httpx",
+    "chars": 4941,
+    "sha256": "d58f476c1273c9c06c978467c6596620d3840ea8c99ba9d32300ab3286f0e0c3"
+  },
+  {
+    "repo": "python-attrs/attrs",
+    "slug": "python-attrs__attrs",
+    "chars": 7377,
+    "sha256": "0cf0b6a17186588d0dfabb1fd6cc3544b1934a378788017315d53af6d55d824a"
+  },
+  {
+    "repo": "Delgan/loguru",
+    "slug": "Delgan__loguru",
+    "chars": 19808,
+    "sha256": "284609d9e5cb8c08293abb14b15358c831ecd11d7effff6118c08fc6286eee9a"
+  },
+  {
+    "repo": "psf/black",
+    "slug": "psf__black",
+    "chars": 9875,
+    "sha256": "c927c6843f8a93345f3ac6fe137b9163c4e4d4a8d544d2da0919d86ca420b567"
+  },
+  {
+    "repo": "pydantic/pydantic",
+    "slug": "pydantic__pydantic",
+    "chars": 3591,
+    "sha256": "ce51f0aeaec3e44c54fd3311c305aae33b1569f95a9f9a5b1cc0aa8b3a51daf6"
+  },
+  {
+    "repo": "httpie/cli",
+    "slug": "httpie__cli",
+    "chars": 4883,
+    "sha256": "c2eb9bb804c3d07b8865f8347ea95b57ed071e47ea1ca7aef7eb118ff959c3e2"
+  },
+  {
+    "repo": "expressjs/express",
+    "slug": "expressjs__express",
+    "chars": 10372,
+    "sha256": "3cf5f3e224dbb9b5e2bc0ac255871de453762ae7a277f868da5f4a69d6ff2509"
+  },
+  {
+    "repo": "chalk/chalk",
+    "slug": "chalk__chalk",
+    "chars": 13885,
+    "sha256": "83afc9420595c1f7bb4ad5e13c2d77614676983f3df1e58acbb6985ed6a2ad7b"
+  },
+  {
+    "repo": "sindresorhus/execa",
+    "slug": "sindresorhus__execa",
+    "chars": 12061,
+    "sha256": "4f75e362d675305cd26450cd8be44c80f31a7a330f8e5b4d8b37200ddc3ea330"
+  },
+  {
+    "repo": "mochajs/mocha",
+    "slug": "mochajs__mocha",
+    "chars": 4424,
+    "sha256": "0a9bc302775e83c6d26181d44946c1d106469883f3e7fcef3de18688126ec45a"
+  },
+  {
+    "repo": "fastify/fastify",
+    "slug": "fastify__fastify",
+    "chars": 16462,
+    "sha256": "882746f2c6e7c898ad7ba56d4db2fbbd891b75d73d39625cdf0bf4967263eb53"
+  },
+  {
+    "repo": "lodash/lodash",
+    "slug": "lodash__lodash",
+    "chars": 3619,
+    "sha256": "882ff84de79568af63234100cfc6497f091195c358cb27b91dc2c4b27692be03"
+  },
+  {
+    "repo": "sindresorhus/got",
+    "slug": "sindresorhus__got",
+    "chars": 19752,
+    "sha256": "7081389ece23c85b4dbc419573bdf3cc5ebfb87f7e599fe96e240666c915f16a"
+  },
+  {
+    "repo": "prettier/prettier",
+    "slug": "prettier__prettier",
+    "chars": 3381,
+    "sha256": "f1f5a86cd0fd0f6a288882527830a9bbbd5851e3238c4d7426b7bbb496165cd1"
+  },
+  {
+    "repo": "spf13/cobra",
+    "slug": "spf13__cobra",
+    "chars": 4949,
+    "sha256": "50473243fcb2851020fc25bcd7ad372fc969825588b9994beec4d9e33523a0c0"
+  },
+  {
+    "repo": "sirupsen/logrus",
+    "slug": "sirupsen__logrus",
+    "chars": 19201,
+    "sha256": "35b73d8ad103872323c4bc853f4ec7e3f826ef333c88928f379a477575d3dc8f"
+  },
+  {
+    "repo": "stretchr/testify",
+    "slug": "stretchr__testify",
+    "chars": 11958,
+    "sha256": "bbff698691d6ed056dfe59725c9a082002c1841bdea4ce1a89e1150fb70ccd0b"
+  },
+  {
+    "repo": "uber-go/zap",
+    "slug": "uber-go__zap",
+    "chars": 5594,
+    "sha256": "7a112782cd047b716c913c041d8eb2f9d3ea388248cb61bd62f7837894acbf76"
+  },
+  {
+    "repo": "labstack/echo",
+    "slug": "labstack__echo",
+    "chars": 11559,
+    "sha256": "3618511bc19002009a93bd6f9bea3efb5857932360baf87e624f1fe30b8c33bc"
+  },
+  {
+    "repo": "gin-gonic/gin",
+    "slug": "gin-gonic__gin",
+    "chars": 11756,
+    "sha256": "f8a8b236019587b81d1fc69292c146a40910c3295c3ec0ba3855910664a97738"
+  },
+  {
+    "repo": "BurntSushi/ripgrep",
+    "slug": "BurntSushi__ripgrep",
+    "chars": 21599,
+    "sha256": "945622d974f65e4e141ef9726c948c2640eebd222c5b101afb6445728283921e"
+  },
+  {
+    "repo": "serde-rs/serde",
+    "slug": "serde-rs__serde",
+    "chars": 4358,
+    "sha256": "0a33359b87747c0ae2437374c1dd4fc4d151ae3122b3931e2757b45d0ed519b8"
+  },
+  {
+    "repo": "dtolnay/anyhow",
+    "slug": "dtolnay__anyhow",
+    "chars": 6054,
+    "sha256": "86f5b88c45b2b9b7eefa0ad66c11918a607319cad683f01123ff38db68b4a49b"
+  },
+  {
+    "repo": "rayon-rs/rayon",
+    "slug": "rayon-rs__rayon",
+    "chars": 5737,
+    "sha256": "eac4e183342f003ec13148773a246168657574f8e7907f1b1ead15461673fd8e"
+  },
+  {
+    "repo": "square/okhttp",
+    "slug": "square__okhttp",
+    "chars": 9686,
+    "sha256": "85d41bd3f65fac5a13bec598fc4ce3401b39a5907ad826f3453ea99acf4e8f2f"
+  },
+  {
+    "repo": "google/guava",
+    "slug": "google__guava",
+    "chars": 6325,
+    "sha256": "1f0d7d670c7bb38ccad13f1969cd59bd834e6e9810574593b2880ac3ff4588bd"
+  },
+  {
+    "repo": "junit-team/junit5",
+    "slug": "junit-team__junit5",
+    "chars": 5690,
+    "sha256": "d8ff2f0759f4be55817f0b1f9141fa98f0d14d9659ebe958c0efe55084d4277c"
+  },
+  {
+    "repo": "FasterXML/jackson-core",
+    "slug": "FasterXML__jackson-core",
+    "chars": 10965,
+    "sha256": "a990f36abe79e973c6533a6611c482cd84778e79a823dffdd38f3fe228211a76"
+  }
+]
