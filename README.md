@@ -60,9 +60,10 @@ The hints were tuned on this template (see below).
 
 - **Token savings: about 52 to 54%** for the shield. The savings come from quarantining the document once instead of re-sending it every turn, not from the schema: a summarize-first baseline saves about the same.
 - **Accuracy under attack:** shield 98% (100% clean); summarize-first 83%, because the free-text summary carries the injection into the main model.
-- **Plain agent:** hijacked on one document (httpx, 3 of 41 turns).
-- **Delimiter baseline** (random markers plus a "data, not instructions" prompt): saves nothing and only partly stops hijacks.
-- **Answer flip on real READMEs (10 documents, 35 questions):** plain agent 71%, shield 66% under attack. There is no shield advantage against a planted false fact. This is the weakness below.
+- **Plain agent:** followed the planted instruction on about 7% of turns (interval 0 to 24%), concentrated in one document (httpx). The shield: 0%.
+- **Token amplification under attack** (attacked cost / clean cost, paired, 13 documents): plain agent 1.09x mean (1.03x median), shielded 1.01x.
+- **Delimiter baseline** (random markers plus a "data, not instructions" prompt): saves no tokens (-2% to +1%) and did not measurably stop hijacks (6% of turns). Only 6 of 13 conversations completed because of rate limits, so this is the weakest-supported row.
+- **Answer flip on real READMEs (10 documents, 35 questions):** accuracy under attack is 71% for the plain agent and 66% for the shield (both 100% clean), with the shield still saving about 54% of tokens. There is no shield advantage against a planted false fact. This is the weakness below.
 
 ### Cross-check against planted false facts (tuning set, not a held-out result)
 
