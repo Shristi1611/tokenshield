@@ -1,0 +1,128 @@
+[
+  {
+    "repo": "ansible/ansible",
+    "slug": "ansible__ansible",
+    "chars": 6154,
+    "sha256": "a0d060dbbf5cc7d8881761018364e29f9b503a1b1229934d1150563f0773448c"
+  },
+  {
+    "repo": "astral-sh/ruff",
+    "slug": "astral-sh__ruff",
+    "chars": 19599,
+    "sha256": "440cda1c08ca3d299590d66de62ce1ff31a5ee40fc16793b5766dd68547348eb"
+  },
+  {
+    "repo": "facebook/react",
+    "slug": "facebook__react",
+    "chars": 5296,
+    "sha256": "9b6ac13cb03c06ae5643376cebd8d0e6cbae7ec0dd30a5cdc443a93160c348eb"
+  },
+  {
+    "repo": "vuejs/core",
+    "slug": "vuejs__core",
+    "chars": 2741,
+    "sha256": "ee86575a4126eb9e9e40f94679f85b9b2f090230924cf984153e1a15563e7ffd"
+  },
+  {
+    "repo": "rollup/rollup",
+    "slug": "rollup__rollup",
+    "chars": 9996,
+    "sha256": "509a34b064a1698f3f1ac659b9630ed9663059ddb6c4d5d033449b0fb2540da9"
+  },
+  {
+    "repo": "vitejs/vite",
+    "slug": "vitejs__vite",
+    "chars": 3392,
+    "sha256": "588718673f32a3691b8e75b93fb4c2f8e8bc9a6dc0bf61794ba7b6c006594111"
+  },
+  {
+    "repo": "jestjs/jest",
+    "slug": "jestjs__jest",
+    "chars": 12764,
+    "sha256": "d47e8d263e376362ade90221309c66071e58b4a2c87fbfd1899eb9a5d9913291"
+  },
+  {
+    "repo": "moment/moment",
+    "slug": "moment__moment",
+    "chars": 3715,
+    "sha256": "7b8b7a10ebe0b611b2cf80cdaa43ca07f3906867aefa9d1750b1597f0657eb88"
+  },
+  {
+    "repo": "chartjs/Chart.js",
+    "slug": "chartjs__Chart.js",
+    "chars": 2605,
+    "sha256": "30418232ad2cc5a51fa0938e12dc97e31cfd1fb3b0bc352132f281c0c10da348"
+  },
+  {
+    "repo": "ReactiveX/rxjs",
+    "slug": "ReactiveX__rxjs",
+    "chars": 7101,
+    "sha256": "c53f92651264aeb5c8e43062a7b4f45d0d9f3e4ff6a51bb0374def2486986cdd"
+  },
+  {
+    "repo": "pinojs/pino",
+    "slug": "pinojs__pino",
+    "chars": 4864,
+    "sha256": "9c6a2b59d1934e091a9be2ef292215f0c512ff72f9816caebb5609242cd72910"
+  },
+  {
+    "repo": "prometheus/prometheus",
+    "slug": "prometheus__prometheus",
+    "chars": 9689,
+    "sha256": "fb0d761371424c5fe128cbee49d1c2999c0b99d554a5f2332b1148d97b99b04d"
+  },
+  {
+    "repo": "etcd-io/etcd",
+    "slug": "etcd-io__etcd",
+    "chars": 10197,
+    "sha256": "d78b5f4555f76984a161a824a06722f8ed5b00e7cf9d845a75ccda1d134deae1"
+  },
+  {
+    "repo": "tokio-rs/tokio",
+    "slug": "tokio-rs__tokio",
+    "chars": 9680,
+    "sha256": "cfefe9d435f3660130db2417e51ab523376c262011d8b631678b6bb373731197"
+  },
+  {
+    "repo": "alacritty/alacritty",
+    "slug": "alacritty__alacritty",
+    "chars": 4365,
+    "sha256": "0dd7c6ea42dc74f2d1949ec0217e15ecf348d6194757bf3d97af22834aeea1ae"
+  },
+  {
+    "repo": "apache/commons-lang",
+    "slug": "apache__commons-lang",
+    "chars": 7237,
+    "sha256": "8bcd50f838ce38164c486a2ae4b5091c146d057c690c09b2b37c774009676069"
+  },
+  {
+    "repo": "mockito/mockito",
+    "slug": "mockito__mockito",
+    "chars": 5021,
+    "sha256": "88681e61754488c46d9a220fcf846d7d99d52375380f2aef03e89f44ff64bc0b"
+  },
+  {
+    "repo": "google/gson",
+    "slug": "google__gson",
+    "chars": 6863,
+    "sha256": "99334a8b8b2cb35934b65f3217b53fe2b3b2c6e514682558b2327e3b4ad9db6f"
+  },
+  {
+    "repo": "google/guice",
+    "slug": "google__guice",
+    "chars": 3776,
+    "sha256": "ad03b210a4d3868e9e2bd31b8a21a2731c2f053dba8402d833adb1ee7e23cd01"
+  },
+  {
+    "repo": "fmtlib/fmt",
+    "slug": "fmtlib__fmt",
+    "chars": 10023,
+    "sha256": "55da3c511c3d78a9f11cf70efaac3882eda8537891e98e192b88e8028cf4a460"
+  },
+  {
+    "repo": "jqlang/jq",
+    "slug": "jqlang__jq",
+    "chars": 2684,
+    "sha256": "2050b0eb357e6b0aa376ba2399acaae5e4938c9e78908a0e6853705e194be281"
+  }
+]
