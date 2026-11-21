@@ -8,6 +8,9 @@ It runs as a **standalone, OpenAI-compatible gateway in front of [Bifrost](https
 
 Built for the Geek Room Global AI Hackathon (Bifrost track and Tavily track, one integrated project).
 
+**Live demo:** https://shristi1611.github.io/tokenshield/ (hosted page replays labelled recorded runs; live runs need the local setup below)
+**Source:** https://github.com/shristi1611/tokenshield
+
 ## What it does
 
 | Layer | What it does | Status |
@@ -15,12 +18,12 @@ Built for the Geek Room Global AI Hackathon (Bifrost track and Tavily track, one
 | 1. Typed-fact quarantine | Untrusted text goes to a quarantined model. Its JSON is checked against a strict schema (booleans, bounded numbers, enums, restricted tokens, no free text). Any error fails closed to a fixed `[TS-BLOCKED]` placeholder. | Built, benchmarked |
 | 2. Conformal token budgets | Split-conformal threshold (alpha 0.1) learned from clean runs; runs above it are flagged. | Measured in the API; enforced per session in the gateway only |
 | 3. Trap advisories | Shared warnings about known token traps. | Designed, not a headline result |
-| Cross-check (extension of layer 1) | Splits a document into sections, extracts each, and flags a license or version the sections disagree on as `conflict`. | Built; tuning results only, held-out run pending |
-| Freshness check (Tavily) | Extracts time-sensitive claims from an answer, searches Tavily per claim, quarantines the results like any other untrusted text, and computes the verdict in code. | Works end to end; precision and recall **not measured** |
+| Cross-check (extension of layer 1) | Splits a document into sections, extracts each, and flags a license or version the sections disagree on as `conflict`. | Built; tuned on 8 documents, held-out run in progress (interim numbers below) |
+| Freshness check (Tavily) | Extracts time-sensitive claims from an answer, searches Tavily per claim, quarantines the results like any other untrusted text, and computes the verdict in code. | Works end to end; measured on 48 real version claims (versions only) |
 
 ## Results
 
-Results in this section are on **templated documents** and are **token counts** on the Groq free tier, on **templated documents** (READMEs and build logs generated from templates). Intervals are 95% bootstrap intervals over conversations: they show run-to-run spread, not real-world variance. No dollar savings are claimed.
+All results are **token counts** on the Groq free tier. The first three tables use **templated documents** (READMEs and build logs generated from templates); the sections after them use real public documents. Intervals are 95% bootstrap intervals over conversations: they show run-to-run spread, not real-world variance. No dollar savings are claimed.
 
 **Long multi-turn conversations (10 READMEs x 5 turns, padded README):**
 
@@ -65,11 +68,11 @@ The hints were tuned on this template (see below).
 - **Delimiter baseline** (random markers plus a "data, not instructions" prompt): saves no tokens (-2% to +1%) and did not measurably stop hijacks (6% of turns). Only 6 of 13 conversations completed because of rate limits, so this is the weakest-supported row.
 - **Answer flip on real READMEs (10 documents, 35 questions):** accuracy under attack is 71% for the plain agent and 66% for the shield (both 100% clean), with the shield still saving about 54% of tokens. There is no shield advantage against a planted false fact. This is the weakness below.
 
-### Cross-check against planted false facts (tuning set, not a held-out result)
+### Cross-check against planted false facts
 
 The shield cannot tell a lie from a fact, so we tried a cross-check: extract from two or three sections separately and flag a disagreement. A flag does not make the answer right, it only turns a confident wrong answer into a visible one. It catches only a lie that sits in a different section from the true statement.
 
-On the 8 real tuning documents with a planted false license (design id `bffc38956551`, frozen before any held-out run):
+**Tuning set** (8 real documents with a planted false license; design id `bffc38956551`, frozen before any held-out run):
 
 | Method | Fooled | Flagged as conflict | False alarms on clean docs |
 |---|---|---|---|
@@ -80,19 +83,49 @@ On the 8 real tuning documents with a planted false license (design id `bffc3895
 
 Cost: 2 or 3 model calls per document instead of 1; about 13% (2 sections) and 29% (3 sections) more tokens. The planted release number was almost never flagged, because most READMEs state no version. The anchor hints barely helped on real documents.
 
-**Held-out result: pending.** 21 further READMEs, run once, with 2 sections as the primary method. Intervals on 8 documents are very wide, so treat the table above as indicative only.
+**Held-out set, INTERIM (14 of 21 documents finished; replace this block when the run completes).** The design was frozen before this run and the held-out documents were never used for tuning. 2 sections is the main method.
+
+| Method | Planted license fooled | Flagged as conflict | Clean docs wrongly flagged |
+|---|---|---|---|
+| Single extraction, no hints | 13 of 13 | 0 | 0 of 14 |
+| Single extraction, shipped hints | 11 of 13 | 0 | 0 of 14 |
+| Cross-check, 2 sections | 1 of 13 | 12 of 13 | 0 of 13 |
+| Cross-check, 3 sections | 0 of 13 | 13 of 13 | 0 of 13 |
+
+Read this carefully. A flag is not a fix: the agent still does not know which license is true. The cross-check works here because the planted note and the real License section land in different sections. The one miss with 2 sections was a note planted next to the license, and a test shows that case beats it. An attacker who knows the design would plant the false claim inside or beside the License section, and the cross-check would not see it. Our attack positions (start, middle, end of the document) are not adversarial, and the planted note is not subtle. The planted release number was flagged rarely (2 of 13 with 2 sections). Cost: two or three model calls per document, about 17% (2 sections) and 37% (3 sections) more tokens than a single extraction.
+
+### Freshness check (Tavily), measured on software versions
+
+48 real claims: 24 products, each with one fresh claim (the newest stable series) and one stale claim (an older series that used to be newest). Ground truth comes from a release tracker read on 2026-11-19 (endoflife.date), not from Tavily or the model; we spot-checked three products against independent sources (Python 3.15, Rust 1.100, Laravel 13). Shipped settings, one run, no tuning.
+
+| | Result |
+|---|---|
+| Stale claims caught (said outdated) | 16 of 24 (67%, 95% interval 46% to 83%) |
+| Stale claims said current | 0 of 24 |
+| Stale claims left unsure | 8 of 24 |
+| Precision of "outdated" | 80% (16 of 20) |
+| Fresh claims confirmed current | 12 of 24 |
+| Fresh claims wrongly said outdated | 4 of 24 (17%, 95% interval 4% to 33%) |
+| Fresh claims left unsure or not extracted | 8 of 24 |
+| Cost per claim | 1 Tavily search, 3 model calls, about 2,000 tokens |
+
+It works as a "needs checking" flag, not a verifier: it never called a stale answer current, but it confirmed only half of the fresh ones. The false alarms we inspected came from out-of-date third-party pages in Tavily's results (for example a blog post stating Python 3.14 as the latest), which the quarantined model read correctly; its recency estimate for such pages is also unreliable. Stale claims one series behind were caught 64% of the time (14 of 22), the two claims two series behind 2 of 2. Versions only, one phrasing, small sample.
+
+### When does the shield pay for itself?
+
+From the saved real-document conversations (13 READMEs of about 900 to 3,400 tokens each, no new model calls): the shield cost 29.6% more after the first question and was 29.2% cheaper after the second. It was cheaper from the second question on for all 13 documents. The one-off quarantine cost averages 2,527 tokens, against 2,148 for the plain agent's first question. A single-question task still costs more, and documents shorter than the ones tested (all were over 2,500 characters) are not covered.
 
 ## Where it falls short
 
 We report these on purpose.
 
-- **Planted false facts are not stopped.** A typed fact blocks instructions, not lies. On real READMEs the shield scored 66% against the plain agent's 71% under a planted false license. The cross-check flags about 5 of 8 planted licenses on the tuning set, still misses the rest, and does not say which value is true.
-- **Hints were tuned on the templated flip test.** On real documents they did not generalise (see the table above).
-- **Short tasks cost more.** On single-question tasks with short documents the shield used about 2.6x more tokens (the quarantine call is overhead). The savings come from long conversations.
+- **Planted false facts are not stopped.** A typed fact blocks instructions, not lies. On real READMEs the shield scored 66% against the plain agent's 71% under a planted false license. The cross-check flags most planted licenses when the lie is far from the true statement, but it does not say which value is true, and it cannot see a lie planted next to the true statement.
+- **Hints were tuned on the templated flip test.** On real documents they barely helped.
+- **A single question costs more.** The shield costs about 30% more tokens on the first question and pays for itself from the second (13 real documents). The savings come from conversations of two or more questions.
 - **Denial of service.** If the quarantined model is hijacked into prose or an oversized reply, extraction fails closed and the main model sees only a placeholder. That is safe, but the user gets less.
-- **Small samples.** 13 real documents for the burn attack, 8 for the tuning cross-check. One attack template per kind, and the planted note is not subtle.
+- **Small samples.** 13 real documents for the burn attack, 8 for tuning and 21 for the held-out cross-check, 24 products for freshness. One attack template per kind, and the planted note is not subtle.
+- **Freshness is a flag, and only measured on versions.** It confirmed half the fresh claims and wrongly flagged 17%; its answers are only as good as the pages Tavily returns. Prices, office holders and laws are unmeasured.
 - **Free-tier noise.** Rate limits cut some runs short. Failed runs are reported with their spend, not dropped.
-- **Freshness is unmeasured.** There is no labelled precision/recall number for the Tavily check yet.
 - **Layer 2 is enforced only in the gateway**, not in the API pipeline.
 
 ## How Bifrost and Tavily are used
@@ -124,7 +157,7 @@ The API only accepts pages served from `localhost:5173` or `localhost:3000`; for
 
 Tests and lint: `pytest -q` and `ruff check src tests scripts`.
 
-Reproduce the benchmarks (each run spends free-tier tokens): `scripts\run_benchmark.py`, `run_multiturn.py`, `run_logbench.py`, `run_flipbench.py`, `run_multiturn.py --docs data\\realdocs`, `run_crosscheck.py`, then `scripts\report.py results\<file>.jsonl`. Raw results are in `results/` and are kept as evidence, including failed and rate-limited attempts.
+Reproduce the benchmarks (each run spends free-tier tokens): `scripts\run_benchmark.py`, `run_multiturn.py`, `run_logbench.py`, `run_flipbench.py`, `run_multiturn.py --docs data\realdocs`, `run_crosscheck.py`, `run_freshness.py`, `break_even.py`, then `scripts\report.py results\<file>.jsonl`. Raw results are in `results/` and are kept as evidence, including failed and rate-limited attempts.
 
 ## Frontend
 
@@ -133,7 +166,7 @@ Reproduce the benchmarks (each run spends free-tier tokens): `scripts\run_benchm
 ## Layout
 
 ```
-src/tokenshield/   schema, extractor, crosscheck, baselines, realdocs, gate, shield, meter, chat, bifrost_client,
+src/tokenshield/   schema, extractor, crosscheck, crosscheck_eval, baselines, realdocs, breakeven, freshness_eval, gate, shield, meter, chat, bifrost_client,
                    tavily_client, freshness, budget, benchmarks, reporting, api, gateway
 scripts/           runners, probes, demos
 tests/             unit tests for all of the above
