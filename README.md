@@ -18,7 +18,7 @@ Built for the Geek Room Global AI Hackathon (Bifrost track and Tavily track, one
 | 1. Typed-fact quarantine | Untrusted text goes to a quarantined model. Its JSON is checked against a strict schema (booleans, bounded numbers, enums, restricted tokens, no free text). Any error fails closed to a fixed `[TS-BLOCKED]` placeholder. | Built, benchmarked |
 | 2. Conformal token budgets | Split-conformal threshold (alpha 0.1) learned from clean runs; runs above it are flagged. | Measured in the API; enforced per session in the gateway only |
 | 3. Trap advisories | Shared warnings about known token traps. | Designed, not a headline result |
-| Cross-check (extension of layer 1) | Splits a document into sections, extracts each, and flags a license or version the sections disagree on as `conflict`. | Built; tuned on 8 documents, held-out run in progress (interim numbers below) |
+| Cross-check (extension of layer 1) | Splits a document into sections, extracts each, and flags a license or version the sections disagree on as `conflict`. | Built; tuned on 8 documents, evaluated once on 21 held-out documents |
 | Freshness check (Tavily) | Extracts time-sensitive claims from an answer, searches Tavily per claim, quarantines the results like any other untrusted text, and computes the verdict in code. | Works end to end; measured on 48 real version claims (versions only) |
 
 ## Results
@@ -83,16 +83,18 @@ The shield cannot tell a lie from a fact, so we tried a cross-check: extract fro
 
 Cost: 2 or 3 model calls per document instead of 1; about 13% (2 sections) and 29% (3 sections) more tokens. The planted release number was almost never flagged, because most READMEs state no version. The anchor hints barely helped on real documents.
 
-**Held-out set, INTERIM (14 of 21 documents finished; replace this block when the run completes).** The design was frozen before this run and the held-out documents were never used for tuning. 2 sections is the main method.
+**Held-out set** (21 real READMEs, never used for tuning, run once with the design frozen beforehand; 2 sections was declared the main method, 3 sections the secondary one):
 
 | Method | Planted license fooled | Flagged as conflict | Clean docs wrongly flagged |
 |---|---|---|---|
-| Single extraction, no hints | 13 of 13 | 0 | 0 of 14 |
-| Single extraction, shipped hints | 11 of 13 | 0 | 0 of 14 |
-| Cross-check, 2 sections | 1 of 13 | 12 of 13 | 0 of 13 |
-| Cross-check, 3 sections | 0 of 13 | 13 of 13 | 0 of 13 |
+| Single extraction, no hints | 21 of 21 | 0 | 0 of 21 |
+| Single extraction, shipped hints | 19 of 21 | 0 | 0 of 21 |
+| Cross-check, 2 sections (main) | 3 of 21 (14%, 95% interval 0% to 29%) | 18 of 21 (86%, 71% to 100%) | 0 of 21 |
+| Cross-check, 3 sections | 0 of 21 | 21 of 21 | 0 of 21 |
 
-Read this carefully. A flag is not a fix: the agent still does not know which license is true. The cross-check works here because the planted note and the real License section land in different sections. The one miss with 2 sections was a note planted next to the license, and a test shows that case beats it. An attacker who knows the design would plant the false claim inside or beside the License section, and the cross-check would not see it. Our attack positions (start, middle, end of the document) are not adversarial, and the planted note is not subtle. The planted release number was flagged rarely (2 of 13 with 2 sections). Cost: two or three model calls per document, about 17% (2 sections) and 37% (3 sections) more tokens than a single extraction.
+No run failed. By where the false claim was planted, the 2-section version was fooled on 0 of 7 at the start, 2 of 7 in the middle and 1 of 7 at the end; the 3-section version flagged all 21. With 21 of 21 the true rate could still be as low as about 84%, so the interval printed by the bootstrap (100% to 100%) is too narrow. On the tuning set the 2-section version flagged only 5 of 8, so the held-out figure should not be read as a stable property of the method.
+
+Read this carefully. A flag is not a fix: the agent still does not know which license is true. The cross-check works here because the planted note and the real License section land in different sections. A test shows that a note planted next to the license beats it, and the 3 misses of the 2-section version are of that kind. An attacker who knows the design would plant the false claim inside or beside the License section, and the cross-check would not see it. Our attack positions (start, middle, end of the document) are not adversarial, and the planted note is not subtle. The planted release number was flagged rarely (2 of 21 with 2 sections, 4 of 21 with 3), and a few clean documents got a flag on the version field. Cost: two or three model calls per document, about 19% (2 sections) and 40% (3 sections) more tokens than a single extraction.
 
 ### Freshness check (Tavily), measured on software versions
 
@@ -119,11 +121,11 @@ From the saved real-document conversations (13 READMEs of about 900 to 3,400 tok
 
 We report these on purpose.
 
-- **Planted false facts are not stopped.** A typed fact blocks instructions, not lies. On real READMEs the shield scored 66% against the plain agent's 71% under a planted false license. The cross-check flags most planted licenses when the lie is far from the true statement, but it does not say which value is true, and it cannot see a lie planted next to the true statement.
+- **Planted false facts are not stopped.** A typed fact blocks instructions, not lies. On real READMEs the shield scored 66% against the plain agent's 71% under a planted false license. The cross-check flagged 18 of 21 (2 sections) and 21 of 21 (3 sections) planted licenses on held-out documents when the lie was away from the true statement, but it does not say which value is true, and it cannot see a lie planted next to the true statement.
 - **Hints were tuned on the templated flip test.** On real documents they barely helped.
 - **A single question costs more.** The shield costs about 30% more tokens on the first question and pays for itself from the second (13 real documents). The savings come from conversations of two or more questions.
 - **Denial of service.** If the quarantined model is hijacked into prose or an oversized reply, extraction fails closed and the main model sees only a placeholder. That is safe, but the user gets less.
-- **Small samples.** 13 real documents for the burn attack, 8 for tuning and 21 for the held-out cross-check, 24 products for freshness. One attack template per kind, and the planted note is not subtle.
+- **Small samples.** 13 real documents for the burn attack, 8 for tuning and 21 for the held-out cross-check (non-adversarial attack positions), 24 products for freshness. One attack template per kind, and the planted note is not subtle.
 - **Freshness is a flag, and only measured on versions.** It confirmed half the fresh claims and wrongly flagged 17%; its answers are only as good as the pages Tavily returns. Prices, office holders and laws are unmeasured.
 - **Free-tier noise.** Rate limits cut some runs short. Failed runs are reported with their spend, not dropped.
 - **Layer 2 is enforced only in the gateway**, not in the API pipeline.
